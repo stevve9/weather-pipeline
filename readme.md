@@ -5,8 +5,6 @@ OpenWeather API, memproses dan menyimpannya ke PostgreSQL secara terjadwal
 otomatis, lalu memvisualisasikannya lewat dashboard Streamlit — semuanya
 berjalan sebagai container Docker yang bisa dinyalakan dengan satu command.
 
-Project ini dibuat sebagai portofolio untuk melamar posisi **Data Engineer**.
-
 ---
 
 ## Arsitektur
