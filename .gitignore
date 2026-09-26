@@ -1,0 +1,24 @@
+.env
+
+# Data yang dihasilkan pipeline (bukan source code, tidak perlu di-track)
+data/raw/
+data/processed/
+
+# Log file
+pipeline.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+venv/
+env/
+
+# Docker
+# (tidak perlu exclude apa pun terkait Docker, image dibangun dari Dockerfile)
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

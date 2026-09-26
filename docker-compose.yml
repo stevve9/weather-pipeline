@@ -1,0 +1,102 @@
+# docker-compose.yml
+# ----------------------------------------------------------------------
+# Menjalankan SELURUH project dengan satu command: docker compose up -d
+#
+# 3 service yang didefinisikan:
+#   1. db        -> PostgreSQL, tempat data cuaca disimpan
+#   2. pipeline  -> scheduler.py, ambil data dari API tiap jam & load ke db
+#   3. dashboard -> Streamlit, visualisasi data (buka di localhost:8501)
+#
+# Command yang sering dipakai:
+#   docker compose up -d          -> nyalakan semua service di background
+#   docker compose up -d --build  -> nyalakan + build ulang image (setelah edit kode)
+#   docker compose down           -> matikan semua (data PostgreSQL tetap aman)
+#   docker compose down -v        -> matikan + hapus data (reset total)
+#   docker compose logs -f pipeline  -> lihat log pipeline secara real-time
+#   docker compose logs -f dashboard -> lihat log dashboard secara real-time
+# ----------------------------------------------------------------------
+
+services:
+
+  db:
+    image: postgres:16
+    container_name: weather_postgres
+
+    environment:
+      POSTGRES_USER: weather_user
+      POSTGRES_PASSWORD: weather_pass
+      POSTGRES_DB: weather_db
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weather_user -d weather_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pipeline:
+    build: .
+    container_name: weather_pipeline
+    command: python scheduler.py
+
+    # env_file membaca API key dari file .env kamu.
+    env_file:
+      - .env
+
+    # DB_HOST="db" (bukan "localhost") karena di dalam network Docker,
+    # service lain dipanggil pakai NAMA SERVICE-nya, bukan localhost.
+    # "localhost" di dalam container merujuk ke container itu sendiri,
+    # bukan ke container PostgreSQL yang terpisah.
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: weather_db
+      DB_USER: weather_user
+      DB_PASSWORD: weather_pass
+
+    # Volume ini membuat folder data/ dan file pipeline.log tetap bisa
+    # dilihat di komputer kamu (bukan cuma tersimpan di dalam container),
+    # supaya gampang di-debug atau dicek isinya.
+    volumes:
+      - ./data:/app/data
+      - ./pipeline.log:/app/pipeline.log
+
+    # Tunggu PostgreSQL benar-benar siap (bukan cuma nyala) sebelum
+    # pipeline mulai jalan, supaya tidak error "connection refused".
+    depends_on:
+      db:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    container_name: weather_dashboard
+    # --server.address=0.0.0.0 wajib ada, supaya Streamlit bisa diakses
+    # dari luar container (dari browser di komputer kamu).
+    command: streamlit run app.py --server.address=0.0.0.0 --server.port=8501
+
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: weather_db
+      DB_USER: weather_user
+      DB_PASSWORD: weather_pass
+
+    ports:
+      - "8501:8501"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
